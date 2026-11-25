@@ -5,6 +5,5 @@ st.set_page_config(page_title="SMC + ICT AI", layout="wide")
 st.title("SMC + ICT AI")
 st.subheader("Premium Trading Dashboard")
 st.success("Dashboard successfully connected!")
-from ict_smc import analyze_market
-
+from ict_smc import analyze_market 
 st.header("ICT + SMC Analysis")
