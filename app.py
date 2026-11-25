@@ -25,7 +25,7 @@ h1, h2, h3 {
 </style>
 """, unsafe_allow_html=True)
 
-API = "https://api.binance.com"
+API = "https://api.coinbase.com"
 
 TIMEFRAMES = {
     "1m": "1m",
@@ -41,48 +41,54 @@ TIMEFRAMES = {
 }
 
 @st.cache_data(ttl=30)
+@st.cache_data(ttl=30)
 def get_price():
-
     response = requests.get(
-        API + "/api/v3/ticker/price",
-        params={"symbol": "BTCUSDT"},
+        "https://api.coinbase.com/v2/prices/BTC-USD/spot",
         timeout=10
     )
-
     response.raise_for_status()
+    return float(response.json()["data"]["amount"])
 
-    return float(response.json()["price"])
-
-
+@st.cache_data(ttl=30)
 @st.cache_data(ttl=30)
 def get_candles(interval):
 
+    granularity = {
+        "1m": 60,
+        "5m": 300,
+        "15m": 900,
+        "1h": 3600,
+        "1d": 86400
+    }
+
+    if interval not in granularity:
+        raise ValueError(
+            f"Coinbase par {interval} timeframe abhi supported nahi."
+        )
+
     response = requests.get(
-        API + "/api/v3/klines",
-        params={
-            "symbol": "BTCUSDT",
-            "interval": interval,
-            "limit": 200
-        },
+        "https://api.exchange.coinbase.com/products/BTC-USD/candles",
+        params={"granularity": granularity[interval]},
         timeout=15
     )
 
     response.raise_for_status()
-
     data = response.json()
 
-    df = pd.DataFrame(data, columns=[
-        "time", "open", "high", "low", "close",
-        "volume", "close_time", "quote_volume",
-        "trades", "buy_volume", "buy_quote", "ignore"
-    ])
+    df = pd.DataFrame(
+        data,
+        columns=["time", "low", "high", "open", "close", "volume"]
+    )
 
     for col in ["open", "high", "low", "close", "volume"]:
         df[col] = pd.to_numeric(df[col])
 
     df["time"] = pd.to_datetime(
-        df["time"], unit="ms", utc=True
+        df["time"], unit="s", utc=True
     )
+
+    df = df.sort_values("time").reset_index(drop=True)
 
     return df
 
