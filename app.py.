@@ -1,9 +1,72 @@
 import streamlit as st
+import pandas as pd
+import requests
 
-st.set_page_config(page_title="SMC + ICT AI", layout="wide")
+from ict_smc import analyze_market
+
+st.set_page_config(
+    page_title="SMC + ICT AI",
+    layout="wide"
+)
 
 st.title("SMC + ICT AI")
 st.subheader("Premium Trading Dashboard")
-st.success("Dashboard successfully connected!")
-from ict_smc import analyze_market 
-st.header("ICT + SMC Analysis")
+
+st.success("Coinbase BTC data connection")
+
+timeframe = st.selectbox(
+    "Select BTC Timeframe",
+    ["5 Minutes", "15 Minutes", "1 Hour", "4 Hours"]
+)
+
+granularity = {
+    "5 Minutes": 300,
+    "15 Minutes": 900,
+    "1 Hour": 3600,
+    "4 Hours": 14400
+}
+
+if st.button("Run ICT + SMC Analysis"):
+
+    try:
+        url = (
+            "https://api.exchange.coinbase.com/"
+            "products/BTC-USD/candles"
+        )
+
+        response = requests.get(
+            url,
+            params={
+                "granularity": granularity[timeframe]
+            },
+            timeout=20
+        )
+
+        response.raise_for_status()
+
+        candles = response.json()
+
+        df = pd.DataFrame(
+            candles,
+            columns=[
+                "time", "low", "high",
+                "open", "close", "volume"
+            ]
+        )
+
+        df = df.sort_values("time").reset_index(drop=True)
+
+        result = analyze_market(df)
+
+        st.header("BTC ICT + SMC Analysis")
+
+        for name, value in result.items():
+            st.write(f"**{name}:** {value}")
+
+        st.caption(
+            "Educational market analysis only — "
+            "not a recommendation to trade."
+        )
+
+    except Exception as error:
+        st.error(f"Analysis error: {error}")
