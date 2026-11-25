@@ -1,4 +1,7 @@
 import streamlit as st
+import requests
+import pandas as pd
+import plotly.graph_objects as go
 from datetime import datetime, timezone
 
 st.set_page_config(
@@ -10,42 +13,95 @@ st.set_page_config(
 st.markdown("""
 <style>
 .stApp {
-    background: #080808;
+    background-color: #080808;
     color: white;
 }
 [data-testid="stSidebar"] {
-    background: #151515;
+    background-color: #151515;
 }
 h1, h2, h3 {
     color: #D4AF37 !important;
 }
-div[data-testid="stMetric"] {
-    background: #171717;
-    border: 1px solid #D4AF37;
-    padding: 15px;
-    border-radius: 12px;
-}
-.gold {
-    color: #D4AF37;
-}
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown(
-    "<h1>⚡ ICT SMART AI TRADING BOT</h1>",
-    unsafe_allow_html=True
+API = "https://api.binance.com"
+
+TIMEFRAMES = {
+    "1m": "1m",
+    "3m": "3m",
+    "5m": "5m",
+    "15m": "15m",
+    "30m": "30m",
+    "1H": "1h",
+    "2H": "2h",
+    "4H": "4h",
+    "Daily": "1d",
+    "Weekly": "1w"
+}
+
+@st.cache_data(ttl=30)
+def get_price():
+
+    response = requests.get(
+        API + "/api/v3/ticker/price",
+        params={"symbol": "BTCUSDT"},
+        timeout=10
+    )
+
+    response.raise_for_status()
+
+    return float(response.json()["price"])
+
+
+@st.cache_data(ttl=30)
+def get_candles(interval):
+
+    response = requests.get(
+        API + "/api/v3/klines",
+        params={
+            "symbol": "BTCUSDT",
+            "interval": interval,
+            "limit": 200
+        },
+        timeout=15
+    )
+
+    response.raise_for_status()
+
+    data = response.json()
+
+    df = pd.DataFrame(data, columns=[
+        "time", "open", "high", "low", "close",
+        "volume", "close_time", "quote_volume",
+        "trades", "buy_volume", "buy_quote", "ignore"
+    ])
+
+    for col in ["open", "high", "low", "close", "volume"]:
+        df[col] = pd.to_numeric(df[col])
+
+    df["time"] = pd.to_datetime(
+        df["time"], unit="ms", utc=True
+    )
+
+    return df
+
+
+st.title("⚡ ICT SMART AI TRADING BOT")
+
+st.caption(
+    "ICT + SMC | QUALITY OVER QUANTITY | "
+    "MANUAL EXECUTION ONLY"
 )
 
-st.caption("ICT + SMC | QUALITY OVER QUANTITY | MANUAL TRADING ONLY")
+st.divider()
 
-st.sidebar.title("🟡 NAVIGATION")
-
-page = st.sidebar.radio(
-    "Select Dashboard",
+page = st.sidebar.selectbox(
+    "NAVIGATION",
     [
         "Home",
-        "Gold Signals",
         "BTC Signals",
+        "Gold Signals",
         "Live Chart",
         "Backtesting",
         "Historical Probabilities",
@@ -55,129 +111,189 @@ page = st.sidebar.radio(
     ]
 )
 
-st.divider()
+st.sidebar.markdown("### ACCOUNT SETTINGS")
+st.sidebar.write("Balance: $1,000")
+st.sidebar.write("Preferred Risk: 1%")
+st.sidebar.write("Maximum Risk: 2%")
+st.sidebar.write("Daily Limit: 5")
 
-# ACCOUNT INFORMATION
-c1, c2, c3, c4 = st.columns(4)
+def bitcoin_dashboard():
 
-c1.metric("Account Balance", "$1,000")
-c2.metric("Preferred Risk", "1%")
-c3.metric("Maximum Risk", "2%")
-c4.metric("Daily Signal Limit", "5")
+    st.subheader("₿ BITCOIN MARKET DATA")
 
-st.divider()
+    try:
 
-if page == "Home":
+        price = get_price()
 
-    st.header("🏆 Market Overview")
+        st.success("BINANCE CONNECTION: SUCCESS")
 
-    col1, col2 = st.columns(2)
+        st.metric(
+            "BTC/USDT CURRENT PRICE",
+            f"${price:,.2f}"
+        )
 
-    with col1:
-        st.subheader("🟡 GOLD")
-        st.error("NO TRADE")
-        st.write("Market: XAUUSD")
-        st.write("Data: NOT CONNECTED")
-        st.write("Signal: Waiting")
+        st.caption(
+            "Source: Binance Public API | "
+            "Fetched: " +
+            datetime.now(timezone.utc).strftime(
+                "%Y-%m-%d %H:%M:%S UTC"
+            )
+        )
 
-    with col2:
-        st.subheader("₿ BITCOIN")
-        st.error("NO TRADE")
-        st.write("Market: BTCUSDT")
-        st.write("Data: NOT CONNECTED")
-        st.write("Signal: Waiting")
+    except Exception as e:
 
-    st.subheader("📊 Multi-Timeframe Analysis")
+        st.error("BINANCE DATA UNAVAILABLE")
+        st.write(str(e))
+        st.warning("NO DATA — No verified price available.")
+        return
 
-    st.table({
-        "Timeframe": [
-            "1 Minute", "3 Minutes", "5 Minutes",
-            "15 Minutes", "30 Minutes",
-            "1 Hour", "2 Hours", "4 Hours",
-            "Daily", "Weekly"
-        ],
-        "Gold": ["Waiting"] * 10,
-        "BTC": ["Waiting"] * 10
-    })
-
-    st.warning(
-        "No verified market data or confirmed setup. NO TRADE."
-    )
-
-elif page == "Gold Signals":
-
-    st.header("🟡 GOLD SIGNALS")
-    st.error("NO TRADE")
-
-    st.write("Entry: N/A")
-    st.write("Structural SL: N/A")
-    st.write("TP1: N/A")
-    st.write("TP2: N/A")
-    st.write("TP3: N/A")
-
-    st.info("COMEX data integration pending.")
-
-elif page == "BTC Signals":
-
-    st.header("₿ BTC SIGNALS")
-    st.error("NO TRADE")
-
-    st.write("Entry: N/A")
-    st.write("Structural SL: N/A")
-    st.write("TP1: N/A")
-    st.write("TP2: N/A")
-    st.write("TP3: N/A")
-
-    st.info("Exchange integration pending.")
-
-elif page == "Live Chart":
-
-    st.header("📈 LIVE CHART")
-
-    market = st.selectbox(
-        "Select Market",
-        ["XAUUSD", "BTCUSDT"]
-    )
+    st.divider()
 
     timeframe = st.selectbox(
         "Select Timeframe",
-        ["1m", "3m", "5m", "15m",
-         "30m", "1H", "2H", "4H", "1D", "1W"]
+        list(TIMEFRAMES.keys())
     )
 
-    st.write("Market:", market)
-    st.write("Timeframe:", timeframe)
+    try:
 
-    st.warning("Live data not connected yet.")
+        df = get_candles(TIMEFRAMES[timeframe])
+
+        st.success("HISTORICAL CANDLES: CONNECTED")
+
+        st.write(
+            "Latest candle timestamp (UTC):",
+            df.iloc[-1]["time"].strftime(
+                "%Y-%m-%d %H:%M:%S"
+            )
+        )
+
+        fig = go.Figure(data=[
+            go.Candlestick(
+                x=df["time"],
+                open=df["open"],
+                high=df["high"],
+                low=df["low"],
+                close=df["close"],
+                name="BTC/USDT"
+            )
+        ])
+
+        fig.update_layout(
+            template="plotly_dark",
+            height=500,
+            title=f"BTC/USDT — {timeframe}",
+            xaxis_rangeslider_visible=False
+        )
+
+        st.plotly_chart(
+            fig,
+            use_container_width=True
+        )
+
+        st.subheader("LATEST MARKET CANDLES")
+
+        st.dataframe(
+            df[["time", "open", "high", "low",
+                "close", "volume"]].tail(10),
+            use_container_width=True
+        )
+
+        st.info(
+            "Candles include historical data and may "
+            "include the currently forming candle."
+        )
+
+    except Exception as e:
+
+        st.error("CANDLE DATA UNAVAILABLE")
+        st.write(str(e))
+
+
+if page == "Home":
+
+    st.subheader("📊 MARKET OVERVIEW")
+
+    a, b = st.columns(2)
+
+    with a:
+        st.metric("Account Balance", "$1,000")
+        st.metric("Preferred Risk", "1%")
+
+    with b:
+        st.metric("Maximum Risk", "2%")
+        st.metric("Daily Signal Limit", "5")
+
+    st.divider()
+
+    bitcoin_dashboard()
+
+    st.divider()
+
+    st.warning(
+        "NO TRADE — ICT/SMC confirmation engine "
+        "is not implemented yet."
+    )
+
+
+elif page == "BTC Signals":
+
+    st.title("₿ BTC MARKET ANALYSIS")
+
+    bitcoin_dashboard()
+
+    st.warning(
+        "Market data only. No confirmed trading signal."
+    )
+
+
+elif page == "Gold Signals":
+
+    st.title("🥇 GOLD ANALYSIS")
+
+    st.warning(
+        "NO TRADE — Authorized COMEX data not connected."
+    )
+
+
+elif page == "Live Chart":
+
+    st.title("📈 LIVE MARKET CHART")
+
+    bitcoin_dashboard()
+
 
 elif page == "Backtesting":
 
-    st.header("📊 BACKTESTING")
+    st.title("BACKTESTING ENGINE")
 
-    st.write("Win Rate: INSUFFICIENT DATA")
-    st.write("Profit Factor: INSUFFICIENT DATA")
-    st.write("Maximum Drawdown: INSUFFICIENT DATA")
-    st.write("Expectancy: INSUFFICIENT DATA")
+    st.warning("INSUFFICIENT DATA")
+
+    st.write("Win Rate: Not calculated")
+    st.write("Profit Factor: Not calculated")
+    st.write("Maximum Drawdown: Not calculated")
+
 
 elif page == "Historical Probabilities":
 
-    st.header("🎯 TP PROBABILITY ENGINE")
+    st.title("TP PROBABILITY ENGINE")
 
-    st.write("TP1: INSUFFICIENT DATA")
-    st.write("TP2: INSUFFICIENT DATA")
-    st.write("TP3: INSUFFICIENT DATA")
+    st.warning("INSUFFICIENT DATA")
 
-    st.info("No historical model trained yet.")
+    st.write("TP1: Not calculated")
+    st.write("TP2: Not calculated")
+    st.write("TP3: Not calculated")
+
 
 elif page == "Trade History":
 
-    st.header("📚 TRADE HISTORY")
+    st.title("TRADE HISTORY")
 
-    st.info("No trades recorded.")
+    st.info("No paper trades recorded yet.")
+
 
 elif page == "Risk Calculator":
 
-    st.header("🛡️ RISK CALCULATOR")
+    st.title("RISK CALCULATOR")
 
     balance = st.number_input(
         "Account Balance ($)",
@@ -187,40 +303,43 @@ elif page == "Risk Calculator":
 
     risk = st.slider(
         "Risk Percentage",
-        0.1, 2.0, 1.0, 0.1
+        0.1,
+        2.0,
+        1.0,
+        0.1
     )
 
-    risk_amount = balance * risk / 100
-
-    st.metric("Planned Dollar Risk", f"${risk_amount:.2f}")
-
-    st.write("Preferred Risk: 1%")
-    st.write("Maximum Risk: 2%")
-
-    st.warning(
-        "Structural Stop Loss must be calculated first."
+    st.metric(
+        "Illustrative Risk Amount",
+        f"${balance * risk / 100:.2f}"
     )
+
+    st.info(
+        "Structural SL and position sizing "
+        "engine are not implemented yet."
+    )
+
 
 elif page == "Settings":
 
-    st.header("⚙️ SETTINGS")
+    st.title("⚙️ SETTINGS")
 
     st.write("Starting Balance: $1,000")
     st.write("Preferred Risk: 1%")
     st.write("Maximum Risk: 2%")
-    st.write("Daily Signal Limit: 5")
+    st.write("Trading Mode: SIGNAL ONLY")
+    st.write("Automatic Execution: DISABLED")
 
-    st.success("Signal Only Mode: ENABLED")
-    st.success("Automatic Trading: DISABLED")
 
 st.divider()
 
-st.caption(
-    "ICT SMART AI BOT | VERSION 1.0 | "
-    "NO FORCED TRADES | MANUAL EXECUTION ONLY"
+st.markdown(
+    "QUALITY OVER QUANTITY | "
+    "NO FORCED TRADES | "
+    "MANUAL EXECUTION ONLY"
 )
 
 st.caption(
-    "Dashboard UTC: " +
-    datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    "Educational market-data dashboard. "
+    "Public Binance API. No trading orders."
 )
